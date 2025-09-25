@@ -24,6 +24,10 @@ entrypoint:
     maxNumberOfMessages: 10
     visibilityTimeoutSeconds: 10
     numberOfThreads: 1
+  ses:
+    daily:
+      cron: "${CRON_EXPRESSION}"
+      timezone: "${TIMEZONE}"
 adapters:
   aws:
     dynamodb:
@@ -32,6 +36,12 @@ adapters:
       region: "${AWS_REGION}"
       accessKeyId: "${AWS_ACCESS_KEY_ID}"
       secretAccessKey: "${AWS_SECRET_ACCESS_KEY}"
+      fallbackEmail: "${FALLBACK_EMAIL:fallback-admin@crediya.com}"
+  ses:
+    region: "${AWS_REGION}"
+    accessKeyId: "${AWS_ACCESS_KEY_ID}"
+    secretAccessKey: "${AWS_SECRET_ACCESS_KEY}"
+    email: "${FROM_EMAIL}"
 management:
   endpoints:
     web:
@@ -41,5 +51,42 @@ management:
     health:
       probes:
         enabled: true
+  health:
+    circuitbreakers:
+      enabled: true
 cors:
   allowed-origins: "http://localhost:4200,http://localhost:8080"
+adapter:
+  restconsumer:
+    timeout: 5000
+    url: "http://localhost:8080"
+resilience4j:
+  circuitbreaker:
+    instances:
+      testGet:
+        registerHealthIndicator: true
+        failureRateThreshold: 50
+        slowCallRateThreshold: 50
+        slowCallDurationThreshold: "2s"
+        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 10
+        waitDurationInOpenState: "10s"
+      testPost:
+        registerHealthIndicator: true
+        failureRateThreshold: 50
+        slowCallRateThreshold: 50
+        slowCallDurationThreshold: "2s"
+        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 10
+        waitDurationInOpenState: "10s"
+      authService: # 👈 este es el que usa EmailRepositoryRestAdapter
+        registerHealthIndicator: true
+        failureRateThreshold: 50
+        slowCallRateThreshold: 50
+        slowCallDurationThreshold: "2s"
+        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        waitDurationInOpenState: "10s"
