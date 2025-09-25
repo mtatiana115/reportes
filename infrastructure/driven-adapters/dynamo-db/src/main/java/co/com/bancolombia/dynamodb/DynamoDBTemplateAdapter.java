@@ -1,43 +1,43 @@
 package co.com.bancolombia.dynamodb;
 
 import co.com.bancolombia.dynamodb.helper.TemplateAdapterOperations;
+import co.com.bancolombia.model.report.Report;
+import co.com.bancolombia.model.report.gateways.ReportRepository;
 import org.reactivecommons.utils.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 import reactor.core.publisher.Mono;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedAsyncClient;
-import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
-import java.util.List;
+import java.math.BigDecimal;
 
 
 @Repository
-public class DynamoDBTemplateAdapter extends TemplateAdapterOperations<Object /*domain model*/, String, ModelEntity /*adapter model*/> /* implements Gateway from domain */ {
+public class DynamoDBTemplateAdapter extends TemplateAdapterOperations<Report, String, ReportEntity> implements ReportRepository {
 
-    public DynamoDBTemplateAdapter(DynamoDbEnhancedAsyncClient connectionFactory, ObjectMapper mapper) {
-        /**
-         *  Could be use mapper.mapBuilder if your domain model implement builder pattern
-         *  super(repository, mapper, d -> mapper.mapBuilder(d,ObjectModel.ObjectModelBuilder.class).build());
-         *  Or using mapper.map with the class of the object model
-         */
-        super(connectionFactory, mapper, d -> mapper.map(d, Object.class /*domain model*/), "table_name", "secondary_index" /*index is optional*/);
+    private final String metricKey;
+
+    public DynamoDBTemplateAdapter(DynamoDbEnhancedAsyncClient connectionFactory,
+                                   ObjectMapper mapper,
+                                   @Value("${adapters.aws.dynamodb.metricKey}")
+                                   String metricKey,
+                                   @Value("${adapters.aws.dynamodb.tableName}")
+                                   String tableName) {
+        super(connectionFactory, mapper, d -> mapper.map(d,Report.class), tableName);
+        this.metricKey = metricKey;
     }
 
-    public Mono<List<Object /*domain model*/>> getEntityBySomeKeys(String partitionKey, String sortKey) {
-        QueryEnhancedRequest queryExpression = generateQueryExpression(partitionKey, sortKey);
-        return query(queryExpression);
+    @Override
+    public Mono<Void> incrementApprovedApplicationCountAmount(BigDecimal amount) {
+        return getReport().flatMap(report -> {
+            report.setApprovedApplicationsCount(report.getApprovedApplicationsCount()+1);
+            report.setApprovedApplicationAmount(report.getApprovedApplicationAmount().add(amount));
+            return this.save(report);
+        }).then();
     }
 
-    public Mono<List<Object /*domain model*/>> getEntityBySomeKeysByIndex(String partitionKey, String sortKey) {
-        QueryEnhancedRequest queryExpression = generateQueryExpression(partitionKey, sortKey);
-        return queryByIndex(queryExpression, "secondary_index" /*index is optional if you define in constructor*/);
-    }
-
-    private QueryEnhancedRequest generateQueryExpression(String partitionKey, String sortKey) {
-        return QueryEnhancedRequest.builder()
-                .queryConditional(QueryConditional.keyEqualTo(Key.builder().partitionValue(partitionKey).build()))
-                .queryConditional(QueryConditional.sortGreaterThanOrEqualTo(Key.builder().sortValue(sortKey).build()))
-                .build();
+    @Override
+    public Mono<Report> getReport() {
+        return this.getById(metricKey);
     }
 }

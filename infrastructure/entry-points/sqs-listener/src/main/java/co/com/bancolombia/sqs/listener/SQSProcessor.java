@@ -1,21 +1,23 @@
 package co.com.bancolombia.sqs.listener;
 
+import co.com.bancolombia.usecase.report.ReportUseCase;
+import io.awspring.cloud.sqs.annotation.SqsListener;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Mono;
-import software.amazon.awssdk.services.sqs.model.Message;
 
-import java.util.function.Function;
+import java.math.BigDecimal;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
-public class SQSProcessor implements Function<Message, Mono<Void>> {
-    // private final MyUseCase myUseCase;
+public class SQSProcessor {
+    private final ReportUseCase reportUseCase;
 
-    @Override
-    public Mono<Void> apply(Message message) {
-        System.out.println(message.body());
-        return Mono.empty();
-        // return myUseCase.doAny(message.body());
+    @SqsListener("${entrypoint.sqs.queueReport}")
+    public void onMessage (BigDecimal amount){
+        reportUseCase.incrementApprovedApplicationCountAmount(amount)
+                .doOnError(ex -> log.error("error processing event {}, message will be retried", amount , ex))
+                .subscribe();
     }
 }
