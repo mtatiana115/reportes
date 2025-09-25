@@ -6,9 +6,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record SQSProperties(
         String region,
         String endpoint,
-        String queueUrl,
+        String queueReport,
         int waitTimeSeconds,
         int visibilityTimeoutSeconds,
         int maxNumberOfMessages,
-        int numberOfThreads) {
+        int numberOfThreads,
+        String accessKeyId,
+        String secretAccessKey) {
 }
